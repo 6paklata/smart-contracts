@@ -562,7 +562,50 @@ contract KyberNetwork is Withdrawable, Utils, IKyberNetwork, ReentrancyGuard {
     function handleFees(TradeData memory tradeData) internal returns(bool) {
         // create array of reserves receiving fees + fee percent per reserve
         // fees should add up to 100%.
-        // send total fee amount to fee handler with reserve data.
+
+        uint length = tradeData.numFeePayingReserves;
+        address[] memory eligibleReserves = new address[](length);
+        uint[] memory rebatePercentages = new uint[](length);
+
+        // Updates reserve eligibility and rebate percentages
+        updateEligibilityAndRebates(eligibleReserves, rebatePercentages, tradeData);
+
+        // Todo: Take custom fee and send it to the taker platform. Unable to get taker platform fee address from tradeData...
+
+
+        // Send total fee amount to fee handler with reserve data.
+        require(feeHandlerContract.handleFees.value(tradeData.networkFeeWei)(eligibleReserves, rebatePercentages), "HandleFees failed");
+    }
+
+    function updateEligibilityAndRebates(address[] memory eligibleReserves, uint[] memory rebatePercentages, TradeData memory tradeData) internal pure returns(uint) {
+        uint index; // Index for eligibleReserves and rebatePercentages;
+        uint feePayingReservesBps = tradeData.feePayingReservesBps;
+
+        // Parse ethToToken list
+        index = parseReserveList(eligibleReserves, rebatePercentages, tradeData.ethToToken, index, feePayingReservesBps);
+
+        // Parse tokenToEth list
+        index = parseReserveList(eligibleReserves, rebatePercentages, tradeData.tokenToEth, index, feePayingReservesBps);
+
+        return index;
+    }
+
+    function parseReserveList(address[] memory eligibleReserves, uint[] memory rebatePercentages, TradingReserves memory reserves, uint index, uint feePayingReservesBps) internal pure returns(uint) {
+        uint i;
+
+        for(i = 0; i < reserves.splitValuesBps.length; i ++) {
+            uint splitValueBps = reserves.splitValuesBps[i];
+            if(splitValueBps > 0) {
+                eligibleReserves[index] = address(reserves.addresses[i]);
+                rebatePercentages[index] = getRebatePercentage(splitValueBps, feePayingReservesBps);
+                index ++;
+            }
+        }
+        return index;
+    }
+
+    function getRebatePercentage(uint splitValueBps, uint feePayingReservesBps) internal pure returns(uint) {
+        return splitValueBps * 100 / feePayingReservesBps;
     }
 
     function calcTradeSrcAmounts(uint srcDecimals, uint dstDecimals, uint destAmount, uint[] memory rates, 
