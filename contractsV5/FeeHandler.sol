@@ -11,7 +11,16 @@ contract FeeHandler is IFeeHandler {
     uint constant STARTBLOCK = 0;
     uint constant EPOCH = 10000;
 
-    uint public brrData;
+    uint public brrAndEpochData;
+
+    uint constant SEPARATOR_BITS = 64;
+    uint constant MAX_BPS = 10000;
+    uint public brrAndEpochData;
+    uint public burnInBPS;
+    uint public rebateInBPS;
+    uint public rewardInBPS;
+    uint public epoch;
+    uint public expiryBlock;
 
     uint public totalRebates;
     mapping(uint => uint) public totalRebatesPerEpoch;
@@ -20,12 +29,18 @@ contract FeeHandler is IFeeHandler {
     mapping(uint => uint) public totalRewardsPerEpoch;
     mapping(address => address) public reserveOwners;
 
-    function encodeBRRData() internal returns(uint) {
-        return 1;
+        
+    function encodeData(uint _burn, uint _reward, uint _epoch, uint _expiryBlock) public {
+        // return leftShift(leftShift(leftShift(a, 2) + b, 2) + c, 2) + d;
+        brrAndEpochData = (((((_burn << SEPARATOR_BITS) + _reward) << SEPARATOR_BITS) + _epoch) << SEPARATOR_BITS) + _expiryBlock;
     }
-
-    function decodeBRRData() internal returns(uint, uint) {
-        return (1,2);
+    
+    function decodeData() public {
+        expiryBlock = brrAndEpochData & (1 << SEPARATOR_BITS) - 1;
+        epoch = (brrAndEpochData / (1 << SEPARATOR_BITS)) & (1 << SEPARATOR_BITS) - 1;
+        rewardInBPS = (brrAndEpochData / (1 << SEPARATOR_BITS << SEPARATOR_BITS)) & (1 << SEPARATOR_BITS) - 1;
+        burnInBPS = (brrAndEpochData / (1 << SEPARATOR_BITS << SEPARATOR_BITS << SEPARATOR_BITS)) & (1 << SEPARATOR_BITS) - 1;
+        rebateInBPS = MAX_BPS - rewardInBPS - burnInBPS;
     }
 
     function handleFees(address[] calldata eligibleReserves, uint[] calldata rebatePercentages) external payable returns(bool) {
