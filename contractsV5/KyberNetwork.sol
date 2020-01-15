@@ -713,6 +713,24 @@ contract KyberNetwork is Withdrawable, Utils, IKyberNetwork, ReentrancyGuard {
         return splitValueBps * 100 / feePayingReservesBps;
     }
 
+    function parseReserveList(address[] memory eligibleReserves, uint[] memory rebatePercentages, TradingReserves memory reserves, uint index, uint feePayingReservesBps) internal pure returns(uint) {
+        uint i;
+
+        for(i = 0; i < reserves.splitValuesBps.length; i ++) {
+            uint splitValueBps = reserves.splitValuesBps[i];
+            if(splitValueBps > 0) {
+                eligibleReserves[index] = address(reserves.addresses[i]);
+                rebatePercentages[index] = getRebatePercentage(splitValueBps, feePayingReservesBps);
+                index ++;
+            }
+        }
+        return index;
+    }
+
+    function getRebatePercentage(uint splitValueBps, uint feePayingReservesBps) internal pure returns(uint) {
+        return splitValueBps * 100 / feePayingReservesBps;
+    }
+
     function calcTradeSrcAmounts(uint srcDecimals, uint destDecimals, uint destAmount, uint[] memory rates, 
                                 uint[] memory splitValues)
         internal pure returns (uint srcAmount)
