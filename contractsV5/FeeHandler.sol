@@ -2,6 +2,7 @@ pragma solidity 0.5.11;
 
 import "./IKyberDAO.sol";
 import "./IFeeHandler.sol";
+import "./PermissionGroupsV5.sol";
 import "./UtilsV5.sol";
 
 contract FeeHandler is IFeeHandler, UtilsV5 {
@@ -23,13 +24,12 @@ contract FeeHandler is IFeeHandler, UtilsV5 {
     uint public expiryBlock;
 
     uint public totalRebates;
-    mapping(uint => uint) public totalRebatesPerEpoch;
-    mapping(uint => address) public totalRebatesPerReserve;
+    mapping(uint => address) public totalRebatesPerRebateWallet;
+    mapping(address => address) public reserveRebateWallet;
     uint public totalRewards;
     mapping(uint => uint) public totalRewardsPerEpoch;
-    mapping(address => address) public reserveOwners;
 
-        
+
     function encodeData(uint _burn, uint _reward, uint _epoch, uint _expiryBlock) public {
         brrAndEpochData = (((((_burn << BITS_PER_PARAM) + _reward) << BITS_PER_PARAM) + _epoch) << BITS_PER_PARAM) + _expiryBlock;
     }
@@ -43,7 +43,7 @@ contract FeeHandler is IFeeHandler, UtilsV5 {
     }
 
     function handleFees(address[] calldata eligibleReserves, uint[] calldata rebatePercentages) external payable returns(bool) {
-        
+
         // Per trade check epoch number, and if changed, call DAO to get existing percentage values for reward / burn / rebate
         // Rebates to reserves if entitled. (if reserve isn’t entitled, it means fee wasn’t taken!)
         // Internal accounting per reserve.
@@ -56,7 +56,7 @@ contract FeeHandler is IFeeHandler, UtilsV5 {
 
         // When you update reserve rebate, you must first check if 2 reserves i.e. handled on both token to eth n eth to token.
         // encode totals, 128 bits per reward / rebate.
-        // accumulate rebates per wallet instead of per reserve use reserveOwners
+        // accumulate rebates per wallet instead of per reserve use reserveRebateWallet
         return true;
     }
 
@@ -66,6 +66,13 @@ contract FeeHandler is IFeeHandler, UtilsV5 {
         // send reward
         // update rewardPerEpoch
         // update totalReward
+    }
+
+    function setReserveRebateWallet(PermissionGroupsV5 reserve, address wallet) public returns (bool){
+        require(reserve.admin == msg.sender, "Msg.sender is not the admin of the specified reserve");
+        reserveRebateWallet[address(reserve)] = wallet;
+        // Emit event
+        return true;
     }
 
     function claimReserveRebate(address reserve) public {
@@ -82,16 +89,7 @@ contract FeeHandler is IFeeHandler, UtilsV5 {
         // convert fees to KNC and burn
     }
 
-    // Don't work on this yet
-    function setReserveAdmin(address reserve, address admin) public {
-        // Add onlyAdmin modifier
-
-    }
-
-    function updateReserveOwner(address owner) public {
-        // only Admin?
-        // do we really need this? think anyone can just call claimRebate for reserve and it'll just send the rebates to the reserve address;
-    }
+    // Maybe add function to resetAdmin, set ReserveAdmin/RebateWallet?
 
 
 }
